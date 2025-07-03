@@ -1,0 +1,34 @@
+name: Notify Selected Code Owners on Issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify selected owners
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueTitle = context.payload.issue.title;
+            const issueUrl = context.payload.issue.html_url;
+            const issueAuthor = context.payload.issue.user.login;
+
+            let mentions = [];
+            mentions.push("@akmaily");
+
+            const message =
+              "Issue created by @" + issueAuthor + "\n\n" +
+              "Automatically pinging maintainers:\n" +
+              mentions.join(" ") + "\n\n" +
+              "Please triage or assign this issue as needed.";
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
