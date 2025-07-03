@@ -9,13 +9,14 @@ sub-classing `DataSourceStrategy` and decorating the class with
 
 from __future__ import annotations
 
+import json
+import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
-import json
-import random
 import requests
+
 
 # ----------------------------------------------------------------------
 # Domain object
@@ -23,7 +24,7 @@ import requests
 @dataclass
 class Device:
     uuid: str
-    color: str          # hex "#rrggbb"
+    color: str  # hex "#rrggbb"
 
 
 # ----------------------------------------------------------------------
@@ -32,33 +33,27 @@ class Device:
 class DataSourceStrategy(ABC):
     """Common interface every data source must fulfil."""
 
-    name: str                          # appears in the GUI drop-down
-    formats: List[str]                 # allowed data formats (json/csv …)
+    name: str  # appears in the GUI drop-down
+    formats: List[str]  # allowed data formats (json/csv …)
 
     # --- REST ----------------------------------------------------------
     @abstractmethod
-    def fetch_devices(self, host_port: str) -> List[Device]:
-        ...
+    def fetch_devices(self, host_port: str) -> List[Device]: ...
 
     # --- WebSocket handshake ------------------------------------------
     @abstractmethod
-    def build_ws_uri(self, host_port: str) -> str:
-        ...
+    def build_ws_uri(self, host_port: str) -> str: ...
 
     @abstractmethod
-    def build_subscribe_cmd(
-        self, uuids: List[str], rate: int, fmt: str
-    ) -> str | bytes:
+    def build_subscribe_cmd(self, uuids: List[str], rate: int, fmt: str) -> str | bytes:
         """Return the exact payload that has to be sent after the WS is open.
         May be text (str) or binary (bytes)."""
 
     # --- WebSocket frame parsing --------------------------------------
     @abstractmethod
-    def parse_ws_msg(
-        self, raw: str | bytes
-    ) -> Tuple[float, Dict[str, float]]:
+    def parse_ws_msg(self, raw: str | bytes) -> Tuple[float, Dict[str, float]]:
         """Convert a raw frame into
-           (timestamp, {uuid: value, …})."""
+        (timestamp, {uuid: value, …})."""
         ...
 
     # helper for concrete strategies
@@ -66,18 +61,19 @@ class DataSourceStrategy(ABC):
         if isinstance(maybe_rgb, dict):
             return f"#{maybe_rgb['r']:02x}{maybe_rgb['g']:02x}{maybe_rgb['b']:02x}"
         return maybe_rgb
-    
+
     def server_sends_initial_msg(self) -> bool:
         """Return True if the server always sends *one* informational frame
         immediately after the WebSocket is opened and the client must wait
         (and optionally inspect it) before sending its subscribe command."""
-        return False            # default: talk first
+        return False  # default: talk first
 
     def handle_initial_msg(self, raw: str | bytes) -> None:
         """Called with that very first frame when
         server_sends_initial_msg() is True.
         Default behaviour: just ignore it."""
         return
+
 
 # ----------------------------------------------------------------------
 # Strategy registry  (simple plugin container)
@@ -99,10 +95,10 @@ def get_strategy(name: str) -> DataSourceStrategy:
     return _registry[name]()
 
 
-
 # ======================================================================
 #  Concrete Strategies
 # ======================================================================
+
 
 # ----------------------------------------------------------------------
 # 1) DevDataServer  (existing backend)
@@ -146,19 +142,22 @@ class DevDataServerStrategy(DataSourceStrategy):
         if raw.startswith("{"):
             obj = json.loads(raw)
             ts_UNIX = obj["timestamp"]
-            values = obj["data"][0]          # list in *subscription* order
+            values = obj["data"][0]  # list in *subscription* order
         else:
-             # ---------- CSV ----------
+            # ---------- CSV ----------
             parts = raw.split(",")
             ts = float(parts[0])
             values = list(map(float, parts[1:]))
-        ts = int(ts_UNIX * 1000) # transform UNIX timestamps into correct integer values
+        ts = int(
+            ts_UNIX * 1000
+        )  # transform UNIX timestamps into correct integer values
         return ts, dict(zip(self._uuids, values))
 
 
 # ----------------------------------------------------------------------
 # 2) OmnAIScope DataServer  (new backend)
 # ----------------------------------------------------------------------
+
 
 @register
 class OmnAIScopeStrategy(DataSourceStrategy):
@@ -188,10 +187,12 @@ class OmnAIScopeStrategy(DataSourceStrategy):
         devices: List[Device] = []
         for idx, ds in enumerate(ds_list):
             uid = ds.get("UUID") or ds.get("uuid")
-            # Get colors 
+            # Get colors
             if idx < len(color_list):
                 col = color_list[idx].get("color", {})
-                color_hex = f"#{col.get('r', 0):02x}{col.get('g', 0):02x}{col.get('b', 0):02x}"
+                color_hex = (
+                    f"#{col.get('r', 0):02x}{col.get('g', 0):02x}{col.get('b', 0):02x}"
+                )
             else:
                 color_hex = f"#{random.randint(0, 0xFFFFFF):06x}"
             devices.append(Device(uuid=uid, color=color_hex))
@@ -234,10 +235,10 @@ class OmnAIScopeStrategy(DataSourceStrategy):
 
         # → Binary / unknown  (skip)
         raise ValueError("Unsupported or malformed frame received from OmnAIScope.")
-    
+
     # ---------- WS “server-talks-first” ----------
     def server_sends_initial_msg(self) -> bool:
-        return True             # <- OmnAIScope does send one frame first
+        return True  # <- OmnAIScope does send one frame first
 
     def handle_initial_msg(self, raw):
         # We don’t care what it is for now – but you could log or parse it.
