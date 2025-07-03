@@ -86,6 +86,16 @@ Follow the naming convention:
 > this currently includes CI builds and ng test
 > there are no e2e tests yet, if you want to implement one for your feature it is highly appreciated
 
+## 1. Lint and format your code 
+
+Lint and format the code with the following commands: 
+
+```
+black src/
+isort src/
+flake8 src/
+```
+
 ## 1. Commit Your Changes
 
 Write meaningful commit messages:
