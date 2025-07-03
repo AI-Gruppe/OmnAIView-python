@@ -7,6 +7,8 @@ The example shows how to receive data from a [DevDataServer](https://github.com/
 
 This example is part of the [OmnAIView](https://github.com/AI-Gruppe/OmnAIView) project an OpenSource project for an omnipotent Datavisualization and Dataanalyzing tool and shows an implementation in python instead of Angular. 
 
+If you want to contribute to the project please read the [CONTRIBUTION.md](./CONTRIBUTION.md). 
+
 ---
 ## DataServers
 This project works with all OmnAI compatible Data-Sources. 
